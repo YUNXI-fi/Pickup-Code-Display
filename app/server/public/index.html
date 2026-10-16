@@ -14,7 +14,10 @@
   <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="flex items-center justify-between mb-6">
       <a href="admin.html"><img src="favicon.svg" class="h-9 w-auto" alt="取件码展示"></a>
-      <span id="countBadge" class="bg-primary text-white px-4 py-1.5 rounded-full text-sm font-medium">0</span>
+      <div class="flex items-center gap-3">
+        <span id="countBadge" class="bg-primary text-white px-4 py-1.5 rounded-full text-sm font-medium">0</span>
+        <a href="admin.html" class="text-sm font-medium text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5 hover:border-primary hover:text-primary transition-colors">管理</a>
+      </div>
     </div>
 
     <div id="statusBar" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg hidden transition-opacity duration-300"></div>

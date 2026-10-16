@@ -9,6 +9,11 @@ const COOKIE_KEY = 'pdd_cookie'
 // 与淘宝渠道同构：状态只前进，已取件为终态
 const STATUS_RANK = { to_ship: 1, shipping: 2, pending: 3, picked_up: 4 }
 
+// 拼多多订单状态文案判定（order_status_prompt）
+const DONE_PATTERNS = ['已评价', '交易成功', '交易完成', '交易关闭', '已完成', '退款']
+const TO_SHIP_PATTERNS = ['待发货', '等待发货', '待卖家发货']
+const IN_TRANSIT_PROMPTS = ['待发货', '待收货']
+
 function requireAuth(req, res, next) {
   if (!ADMIN_PASSWORD) return next()
   if (req.headers['x-admin-password'] !== ADMIN_PASSWORD) return res.status(401).json({ error: '未授权' })
@@ -82,18 +87,30 @@ module.exports = function (app) {
           if (!o.order_sn || seen.has(o.order_sn)) continue
           seen.add(o.order_sn)
 
-          // 只有真正拿到取件码才入库（与淘宝渠道同规则：避免占位噪音）
-          const pick = await pdd.fetchPickupCode(cookie, o)
-          if (!pick.code) {
-            skipped.push({ order_id: o.order_sn, reason: '尚未生成取件码' })
+          const prompt = o.order_status_prompt || ''
+          if (DONE_PATTERNS.some(p => prompt.includes(p))) {
+            skipped.push({ order_id: o.order_sn, reason: prompt || '已完成' })
+            continue
+          }
+          if (!IN_TRANSIT_PROMPTS.some(p => prompt.includes(p))) {
+            skipped.push({ order_id: o.order_sn, reason: prompt || '非在途' })
             continue
           }
 
+          // 与淘宝渠道一致：在途订单也入库跟踪；
+          // 到驿站/柜后 cabinet 接口返回取件码，否则为空
+          let code = ''
+          if (o.tracking_number) {
+            const pick = await pdd.fetchPickupCode(cookie, o)
+            code = pick.code
+          }
+
+          const toShip = !o.tracking_number || TO_SHIP_PATTERNS.some(p => prompt.includes(p))
           const r = upsertPackage({
             order_id: o.order_sn,
             mail_no: o.tracking_number || '',
-            status: 'pending',
-            pickup_code: pick.code,
+            status: code ? 'pending' : (toShip ? 'to_ship' : 'shipping'),
+            pickup_code: code,
             company: '',
             recipient: '',
             phone: '',

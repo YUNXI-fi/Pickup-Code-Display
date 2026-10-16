@@ -541,26 +541,60 @@ async function refreshPackages() {
   refreshBtn.querySelector('svg').classList.add('animate-spin')
   showStatus('正在刷新快递状态并拉取新快递，请稍候...', true, false)
   try {
-    const syncRes = await authFetch('api/express/sync', { method: 'POST' })
-    const syncData = await syncRes.json()
-    if (!syncRes.ok) throw new Error(syncData.error || '拉取新快递失败')
+    const [taobaoStatus, pddStatus] = await Promise.all([
+      authFetch('api/express/status').then(r => r.json()).catch(() => null),
+      authFetch('api/pdd/status').then(r => r.json()).catch(() => null),
+    ])
+    if (!taobaoStatus && !pddStatus) {
+      showStatus('无法获取账号配置状态，请刷新页面后重试', false)
+      return
+    }
 
-    const fillRes = await authFetch('api/express/fill-codes', { method: 'POST' })
-    const fillData = await fillRes.json()
-    if (!fillRes.ok) throw new Error(fillData.error || '刷新快递状态失败')
+    const taobaoOn = !!(taobaoStatus && taobaoStatus.cookie_set)
+    const pddOn = !!(pddStatus && pddStatus.cookie_set)
+    if (!taobaoOn && !pddOn) {
+      showStatus('尚未配置淘宝 / 拼多多账号，请先在右上角账号管理中完成配置', false)
+      return
+    }
 
-    // 拼多多渠道：未配置时静默跳过，失败不影响淘宝刷新
-    let pddCreated = 0
-    try {
-      const pddStatus = await (await authFetch('api/pdd/status')).json()
-      if (pddStatus && pddStatus.cookie_set) {
-        const pddRes = await authFetch('api/pdd/sync', { method: 'POST' })
-        if (pddRes.ok) pddCreated = (await pddRes.json()).created.length
+    const parts = []
+    const skipped = []
+    let hadError = false
+
+    if (taobaoOn) {
+      try {
+        const syncRes = await authFetch('api/express/sync', { method: 'POST' })
+        const syncData = await syncRes.json()
+        if (!syncRes.ok) throw new Error(syncData.error || '拉取新快递失败')
+        const fillRes = await authFetch('api/express/fill-codes', { method: 'POST' })
+        const fillData = await fillRes.json()
+        if (!fillRes.ok) throw new Error(fillData.error || '刷新取件码失败')
+        parts.push(`淘宝新增 ${syncData.created.length} 件、刷新取件码 ${fillData.filled.length} 件`)
+      } catch (e) {
+        hadError = true
+        parts.push(`淘宝刷新失败：${e.message}`)
       }
-    } catch (e) { /* 忽略拼多多异常 */ }
+    } else {
+      skipped.push('淘宝')
+    }
+
+    if (pddOn) {
+      try {
+        const pddRes = await authFetch('api/pdd/sync', { method: 'POST' })
+        const pddData = await pddRes.json()
+        if (!pddRes.ok) throw new Error(pddData.error || '拼多多同步失败')
+        parts.push(`拼多多新增 ${pddData.created.length} 件`)
+      } catch (e) {
+        hadError = true
+        parts.push(`拼多多同步失败：${e.message}`)
+      }
+    } else {
+      skipped.push('拼多多')
+    }
 
     loadAll()
-    showStatus(`已拉取新快递 ${syncData.created.length} 件，刷新取件码 ${fillData.filled.length} 件，拼多多新增 ${pddCreated} 件`, true)
+    const tail = skipped.length ? `（未配置${skipped.join('、')}，已跳过）` : ''
+    showStatus(parts.join('；') + tail, !hadError)
   } catch (e) {
     showStatus('刷新失败：' + e.message, false)
   } finally {
