@@ -42,7 +42,7 @@ module.exports = function (app) {
   router.post('/packages', requireAuth, (req, res) => {
     const { pickup_code, company, recipient, phone, address } = req.body
     if (!pickup_code) return res.status(400).json({ error: '取件码不能为空' })
-    const info = stmts.insert.run({ pickup_code, company, recipient, phone, address })
+    const info = stmts.insert.run({ pickup_code, company, recipient, phone, address, source_platform: 'manual' })
     const row = stmts.getById.get(info.lastInsertRowid)
     broadcast('create', row)
     res.status(201).json(row)

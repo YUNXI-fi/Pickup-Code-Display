@@ -101,10 +101,12 @@ function sortItems(items) {
 
 function renderItem(p, color) {
   const picked = p.status === 'picked_up'
+  const platform = { taobao: '淘宝', pdd: '拼多多', manual: '手动' }[p.source_platform] || '手动'
   return `
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 ${color || 'border-l-gray-300'} border-l-4 p-4 flex items-center justify-between hover:shadow-md transition-shadow ${picked ? 'opacity-65' : ''}" data-id="${p.id}">
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
+          <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">${platform}</span>
           <span class="text-2xl font-mono font-bold tracking-widest ${picked ? 'text-gray-400' : 'text-gray-800'}">${escapeHtml(p.pickup_code)}</span>
           ${picked ? '<span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">已取件</span>' : ''}
         </div>

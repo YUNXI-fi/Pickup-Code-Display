@@ -397,11 +397,13 @@ function render() {
     // 待发货/运输中没有取件码，退回展示商品名或状态文案
     const title = p.pickup_code || p.goods_name || meta.label
     const titleCls = !p.pickup_code ? 'text-lg text-gray-600' : (picked ? 'text-gray-400' : 'text-gray-800')
+    const platform = { taobao: '淘宝', pdd: '拼多多', manual: '手动' }[p.source_platform] || '手动'
     return `
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center justify-between ${picked ? 'opacity-60' : ''}" data-id="${p.id}">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-3">
             <span class="text-xs ${meta.badge} px-2 py-0.5 rounded-full flex-shrink-0">${meta.label}</span>
+            <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full flex-shrink-0">${platform}</span>
             <span class="text-xl font-mono font-bold tracking-widest ${titleCls} truncate">${escapeHtml(title)}</span>
           </div>
           <div class="mt-1 text-sm text-gray-500">
@@ -541,26 +543,60 @@ async function refreshPackages() {
   refreshBtn.querySelector('svg').classList.add('animate-spin')
   showStatus('正在刷新快递状态并拉取新快递，请稍候...', true, false)
   try {
-    const syncRes = await authFetch('api/express/sync', { method: 'POST' })
-    const syncData = await syncRes.json()
-    if (!syncRes.ok) throw new Error(syncData.error || '拉取新快递失败')
+    const [taobaoStatus, pddStatus] = await Promise.all([
+      authFetch('api/express/status').then(r => r.json()).catch(() => null),
+      authFetch('api/pdd/status').then(r => r.json()).catch(() => null),
+    ])
+    if (!taobaoStatus && !pddStatus) {
+      showStatus('无法获取账号配置状态，请刷新页面后重试', false)
+      return
+    }
 
-    const fillRes = await authFetch('api/express/fill-codes', { method: 'POST' })
-    const fillData = await fillRes.json()
-    if (!fillRes.ok) throw new Error(fillData.error || '刷新快递状态失败')
+    const taobaoOn = !!(taobaoStatus && taobaoStatus.cookie_set)
+    const pddOn = !!(pddStatus && pddStatus.cookie_set)
+    if (!taobaoOn && !pddOn) {
+      showStatus('尚未配置淘宝 / 拼多多账号，请先在右上角账号管理中完成配置', false)
+      return
+    }
 
-    // 拼多多渠道：未配置时静默跳过，失败不影响淘宝刷新
-    let pddCreated = 0
-    try {
-      const pddStatus = await (await authFetch('api/pdd/status')).json()
-      if (pddStatus && pddStatus.cookie_set) {
-        const pddRes = await authFetch('api/pdd/sync', { method: 'POST' })
-        if (pddRes.ok) pddCreated = (await pddRes.json()).created.length
+    const parts = []
+    const skipped = []
+    let hadError = false
+
+    if (taobaoOn) {
+      try {
+        const syncRes = await authFetch('api/express/sync', { method: 'POST' })
+        const syncData = await syncRes.json()
+        if (!syncRes.ok) throw new Error(syncData.error || '拉取新快递失败')
+        const fillRes = await authFetch('api/express/fill-codes', { method: 'POST' })
+        const fillData = await fillRes.json()
+        if (!fillRes.ok) throw new Error(fillData.error || '刷新取件码失败')
+        parts.push(`淘宝新增 ${syncData.created.length} 件、刷新取件码 ${fillData.filled.length} 件`)
+      } catch (e) {
+        hadError = true
+        parts.push(`淘宝刷新失败：${e.message}`)
       }
-    } catch (e) { /* 忽略拼多多异常 */ }
+    } else {
+      skipped.push('淘宝')
+    }
+
+    if (pddOn) {
+      try {
+        const pddRes = await authFetch('api/pdd/sync', { method: 'POST' })
+        const pddData = await pddRes.json()
+        if (!pddRes.ok) throw new Error(pddData.error || '拼多多同步失败')
+        parts.push(`拼多多新增 ${pddData.created.length} 件`)
+      } catch (e) {
+        hadError = true
+        parts.push(`拼多多同步失败：${e.message}`)
+      }
+    } else {
+      skipped.push('拼多多')
+    }
 
     loadAll()
-    showStatus(`已拉取新快递 ${syncData.created.length} 件，刷新取件码 ${fillData.filled.length} 件，拼多多新增 ${pddCreated} 件`, true)
+    const tail = skipped.length ? `（未配置${skipped.join('、')}，已跳过）` : ''
+    showStatus(parts.join('；') + tail, !hadError)
   } catch (e) {
     showStatus('刷新失败：' + e.message, false)
   } finally {
@@ -650,8 +686,7 @@ evtSource.onerror = () => showToast('实时连接断开，正在重连...', fals
 
 /* ───── 自动同步（淘宝系） ───── */
 
-const syncBadge = document.getElementById('syncBadge')
-const pddBadge = document.getElementById('pddBadge')
+const accountList = document.getElementById('accountList')
 const saveCookieBtn = document.getElementById('saveCookieBtn')
 const taobaoCookieEl = document.getElementById('taobaoCookie')
 const scanLoginBtn = document.getElementById('scanLoginBtn')
@@ -659,6 +694,52 @@ const qrPanel = document.getElementById('qrPanel')
 const qrImg = document.getElementById('qrImg')
 const qrStatus = document.getElementById('qrStatus')
 const qrRefreshBtn = document.getElementById('qrRefreshBtn')
+let activeAccountId = null
+let activePlatform = null
+let taobaoAccounts = []
+let pddAccounts = []
+
+function renderAccountList() {
+  const groups = [
+    ['taobao', '淘宝', taobaoAccounts],
+    ['pdd', '拼多多', pddAccounts],
+  ]
+  const rows = groups.flatMap(([platform, label, list]) => list.map(account => `
+    <div class="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3 gap-3">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">${label}</span>
+          <span class="text-sm font-medium text-gray-700 truncate">${escapeHtml(account.name || `${label}账号`)}</span>
+        </div>
+        <div class="text-xs mt-1 ${account.cookie_set ? 'text-green-600' : 'text-gray-400'}">${account.cookie_set ? 'Cookie 已配置' : 'Cookie 未配置'}</div>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <button class="account-edit-btn text-sm text-primary hover:underline" data-platform="${platform}" data-account-id="${account.id}">更新</button>
+        <button class="account-delete-btn text-sm text-red-500 hover:underline" data-platform="${platform}" data-account-id="${account.id}">删除</button>
+      </div>
+    </div>`))
+  accountList.innerHTML = rows.length ? rows.join('') : '<p class="text-sm text-gray-400 text-center py-3">暂无账号，请点击下方添加账号</p>'
+  accountList.querySelectorAll('.account-edit-btn').forEach(btn => btn.addEventListener('click', () => {
+    activePlatform = btn.dataset.platform
+    activeAccountId = btn.dataset.accountId
+    showAccountView(activePlatform)
+  }))
+  accountList.querySelectorAll('.account-delete-btn').forEach(btn => btn.addEventListener('click', () => deleteAccount(btn.dataset.platform, btn.dataset.accountId)))
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+
+async function deleteAccount(platform, id) {
+  if (!await showConfirm('确定删除这个账号？该账号保存的 Cookie 也会被清除。')) return
+  const path = platform === 'taobao' ? 'api/express/cookie' : 'api/pdd/cookie'
+  const res = await authFetch(`${path}?account_id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!res.ok) return showToast('删除失败', false)
+  showToast('账号已删除', true)
+  if (activeAccountId === id) activeAccountId = null
+  await loadExpressStatus()
+}
 
 function setBadge(el, configured) {
   el.textContent = configured ? 'Cookie 已配置' : '未配置'
@@ -670,23 +751,26 @@ function setBadge(el, configured) {
 async function loadExpressStatus() {
   try {
     const res = await authFetch('api/express/status')
-    if (res.ok) setBadge(syncBadge, (await res.json()).cookie_set)
+    if (res.ok) { const data = await res.json(); taobaoAccounts = data.accounts || [] }
   } catch (e) {}
   try {
     const res = await authFetch('api/pdd/status')
-    if (res.ok) setBadge(pddBadge, (await res.json()).cookie_set)
+    if (res.ok) { const data = await res.json(); pddAccounts = data.accounts || [] }
   } catch (e) {}
+  renderAccountList()
 }
 
 saveCookieBtn.addEventListener('click', async () => {
   const cookie = taobaoCookieEl.value.trim()
   if (!cookie) return showToast('请先粘贴 Cookie', false)
+  const current = taobaoAccounts.find(a => a.id === activeAccountId)
+  const name = prompt('请输入账号备注', current?.name || '淘宝账号')
   saveCookieBtn.disabled = true
   try {
     const res = await authFetch('api/express/cookie', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookie }),
+      body: JSON.stringify({ cookie, account_id: activeAccountId || undefined, name: name || undefined }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || '保存失败')
@@ -704,7 +788,8 @@ const taobaoDeleteBtn = document.getElementById('taobaoDeleteBtn')
 taobaoDeleteBtn.addEventListener('click', async () => {
   if (!await showConfirm('确定删除淘宝账号？将清除已保存的 Cookie。')) return
   try {
-    const res = await authFetch('api/express/cookie', { method: 'DELETE' })
+    const url = activeAccountId ? `api/express/cookie?account_id=${encodeURIComponent(activeAccountId)}` : 'api/express/cookie'
+    const res = await authFetch(url, { method: 'DELETE' })
     if (!res.ok) throw new Error('删除失败')
     showToast('已删除淘宝账号', true)
     showAccountView('list')
@@ -733,10 +818,11 @@ async function startScanLogin() {
   qrRefreshBtn.classList.add('hidden')
   qrPanel.classList.remove('hidden')
   try {
-    const res = await authFetch('api/express/qrcode', { method: 'POST' })
+    const res = await authFetch('api/express/qrcode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account_id: activeAccountId || undefined }) })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || '获取二维码失败')
     qrSessionId = data.session_id
+    activeAccountId = data.account_id || activeAccountId
     qrImg.src = data.qr
     setQrStatus('请用手机淘宝「扫一扫」')
     qrTimer = setInterval(pollQr, 2000)
@@ -753,7 +839,8 @@ async function startScanLogin() {
 async function pollQr() {
   if (!qrSessionId) return
   try {
-    const res = await authFetch('api/express/qrcode/' + qrSessionId)
+    const suffix = activeAccountId ? `?account_id=${encodeURIComponent(activeAccountId)}` : ''
+    const res = await authFetch('api/express/qrcode/' + qrSessionId + suffix)
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || '轮询失败')
 
@@ -792,8 +879,6 @@ const platformPickerView = document.getElementById('platformPickerView')
 const taobaoAddView = document.getElementById('taobaoAddView')
 const pddAddView = document.getElementById('pddAddView')
 const addAccountBtn = document.getElementById('addAccountBtn')
-const taobaoConfigBtn = document.getElementById('taobaoConfigBtn')
-const pddConfigBtn = document.getElementById('pddConfigBtn')
 
 const accountViews = {
   list: accountListView,
@@ -828,9 +913,7 @@ accountModal.addEventListener('click', e => {
   if (e.target === accountModal) closeAccountModal()
 })
 
-addAccountBtn.addEventListener('click', () => showAccountView('picker'))
-taobaoConfigBtn.addEventListener('click', () => showAccountView('taobao'))
-pddConfigBtn.addEventListener('click', () => showAccountView('pdd'))
+addAccountBtn.addEventListener('click', () => { activeAccountId = null; showAccountView('picker') })
 
 document.querySelectorAll('.view-back-btn').forEach(btn => {
   btn.addEventListener('click', () => showAccountView(btn.dataset.back))
@@ -857,12 +940,14 @@ const savePddCookieBtn = document.getElementById('savePddCookieBtn')
 savePddCookieBtn.addEventListener('click', async () => {
   const cookie = pddCookieEl.value.trim()
   if (!cookie) return showToast('请先粘贴 Cookie', false)
+  const current = pddAccounts.find(a => a.id === activeAccountId)
+  const name = prompt('请输入账号备注', current?.name || '拼多多账号')
   savePddCookieBtn.disabled = true
   try {
     const res = await authFetch('api/pdd/cookie', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookie }),
+    body: JSON.stringify({ cookie, account_id: activeAccountId || undefined, name: name || undefined }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || '保存失败')
@@ -879,7 +964,8 @@ const pddDeleteBtn = document.getElementById('pddDeleteBtn')
 pddDeleteBtn.addEventListener('click', async () => {
   if (!await showConfirm('确定删除拼多多账号？将清除已保存的 Cookie。')) return
   try {
-    const res = await authFetch('api/pdd/cookie', { method: 'DELETE' })
+    const url = activeAccountId ? `api/pdd/cookie?account_id=${encodeURIComponent(activeAccountId)}` : 'api/pdd/cookie'
+    const res = await authFetch(url, { method: 'DELETE' })
     if (!res.ok) throw new Error('删除失败')
     showToast('已删除拼多多账号', true)
     showAccountView('list')

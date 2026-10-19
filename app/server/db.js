@@ -69,7 +69,8 @@ async function init() {
     picked_up_at TEXT,
     mail_no TEXT,
     order_id TEXT,
-    goods_name TEXT
+    goods_name TEXT,
+    source_platform TEXT DEFAULT 'manual'
   )`)
   // 兼容旧库：补齐历史版本缺失的列（新库已全部包含，ALTER 会抛错并被忽略）
   try { db.run("ALTER TABLE packages ADD COLUMN company TEXT") } catch (_) {}
@@ -77,6 +78,7 @@ async function init() {
   try { db.run("ALTER TABLE packages ADD COLUMN mail_no TEXT") } catch (_) {}
   try { db.run("ALTER TABLE packages ADD COLUMN order_id TEXT") } catch (_) {}
   try { db.run("ALTER TABLE packages ADD COLUMN goods_name TEXT") } catch (_) {}
+  try { db.run("ALTER TABLE packages ADD COLUMN source_platform TEXT DEFAULT 'manual'") } catch (_) {}
 
   // 旧库的 status CHECK 约束不含 to_ship/shipping，SQLite 无法直接修改约束 → 重建表迁移
   const tinfo = db.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='packages'")
@@ -95,10 +97,11 @@ async function init() {
       picked_up_at TEXT,
       mail_no TEXT,
       order_id TEXT,
-      goods_name TEXT
+      goods_name TEXT,
+      source_platform TEXT DEFAULT 'manual'
     )`)
-    db.run(`INSERT INTO packages (id, pickup_code, recipient, phone, address, company, status, created_at, picked_up_at, mail_no, order_id, goods_name)
-            SELECT id, pickup_code, recipient, phone, address, company, status, created_at, picked_up_at, mail_no, order_id, goods_name FROM packages_old`)
+    db.run(`INSERT INTO packages (id, pickup_code, recipient, phone, address, company, status, created_at, picked_up_at, mail_no, order_id, goods_name, source_platform)
+            SELECT id, pickup_code, recipient, phone, address, company, status, created_at, picked_up_at, mail_no, order_id, goods_name, source_platform FROM packages_old`)
     db.run('DROP TABLE packages_old')
   }
   try { db.run("CREATE INDEX IF NOT EXISTS idx_packages_mail_no ON packages(mail_no)") } catch (_) {}
@@ -120,7 +123,7 @@ const stmts = {
   all: { all: () => prepare('SELECT * FROM packages ORDER BY created_at DESC').all() },
   pending: { all: () => prepare("SELECT * FROM packages WHERE status = 'pending' ORDER BY created_at DESC").all() },
   getById: { get: (id) => prepare('SELECT * FROM packages WHERE id = ?').get([id]) },
-  insert: { run: (p) => prepare('INSERT INTO packages (pickup_code, company, recipient, phone, address) VALUES (@pickup_code, @company, @recipient, @phone, @address)').run({ pickup_code: p.pickup_code, company: p.company || null, recipient: p.recipient || null, phone: p.phone || null, address: p.address || null }) },
+  insert: { run: (p) => prepare('INSERT INTO packages (pickup_code, company, recipient, phone, address, source_platform) VALUES (@pickup_code, @company, @recipient, @phone, @address, @source_platform)').run({ pickup_code: p.pickup_code, company: p.company || null, recipient: p.recipient || null, phone: p.phone || null, address: p.address || null, source_platform: p.source_platform || 'manual' }) },
   pickup: { run: (id) => prepare("UPDATE packages SET status = 'picked_up', picked_up_at = datetime('now','localtime') WHERE id = ? AND status = 'pending'").run([id]) },
   remove: { run: (id) => prepare('DELETE FROM packages WHERE id = ?').run([id]) },
   restore: { run: (id) => prepare("UPDATE packages SET status = 'pending', picked_up_at = NULL WHERE id = ? AND status = 'picked_up'").run([id]) },
@@ -128,7 +131,7 @@ const stmts = {
   historyPhone: { all: () => prepare("SELECT phone AS value, COUNT(*) AS count FROM packages WHERE phone IS NOT NULL AND phone != '' GROUP BY phone ORDER BY count DESC, phone ASC").all() },
   historyAddress: { all: () => prepare("SELECT address AS value, COUNT(*) AS count FROM packages WHERE address IS NOT NULL AND address != '' GROUP BY address ORDER BY count DESC, address ASC").all() },
 
-  insertExpress: { run: (p) => prepare("INSERT INTO packages (pickup_code, company, recipient, phone, address, mail_no, order_id, status, goods_name) VALUES (@pickup_code, @company, @recipient, @phone, @address, @mail_no, @order_id, @status, @goods_name)").run({ pickup_code: p.pickup_code || '', company: p.company || null, recipient: p.recipient || null, phone: p.phone || null, address: p.address || null, mail_no: p.mail_no || null, order_id: p.order_id || null, status: p.status || 'pending', goods_name: p.goods_name || null }) },
+  insertExpress: { run: (p) => prepare("INSERT INTO packages (pickup_code, company, recipient, phone, address, mail_no, order_id, status, goods_name, source_platform) VALUES (@pickup_code, @company, @recipient, @phone, @address, @mail_no, @order_id, @status, @goods_name, @source_platform)").run({ pickup_code: p.pickup_code || '', company: p.company || null, recipient: p.recipient || null, phone: p.phone || null, address: p.address || null, mail_no: p.mail_no || null, order_id: p.order_id || null, status: p.status || 'pending', goods_name: p.goods_name || null, source_platform: p.source_platform || 'manual' }) },
   withOrderId: { all: () => prepare("SELECT * FROM packages WHERE order_id IS NOT NULL AND order_id != '' AND status IN ('shipping','pending') ORDER BY id").all() },
   getByMailNo: { get: (no) => prepare('SELECT * FROM packages WHERE mail_no = ?').get([no]) },
   getByOrderId: { get: (id) => prepare('SELECT * FROM packages WHERE order_id = ?').get([id]) },
@@ -141,7 +144,8 @@ const stmts = {
       address     = COALESCE(NULLIF(@address, ''), address),
       mail_no     = COALESCE(NULLIF(@mail_no, ''), mail_no),
       goods_name  = COALESCE(NULLIF(@goods_name, ''), goods_name)
-    WHERE id = @id`).run({ id: v.id, pickup_code: v.pickup_code || '', company: v.company || '', recipient: v.recipient || '', phone: v.phone || '', address: v.address || '', mail_no: v.mail_no || '', goods_name: v.goods_name || '' }) },
+      ,source_platform = COALESCE(NULLIF(@source_platform, ''), source_platform)
+    WHERE id = @id`).run({ id: v.id, pickup_code: v.pickup_code || '', company: v.company || '', recipient: v.recipient || '', phone: v.phone || '', address: v.address || '', mail_no: v.mail_no || '', goods_name: v.goods_name || '', source_platform: v.source_platform || '' }) },
   /** 状态只前进：待发货 → 运输中 → 待取件；已取件为终态不可覆盖 */
   promoteStatus: { run: (v) => prepare("UPDATE packages SET status = @status WHERE id = @id AND status != 'picked_up'").run({ id: v.id, status: v.status }) },
 
@@ -150,6 +154,7 @@ const stmts = {
 
   setSetting: { run: (v) => prepare('INSERT INTO settings (key, value) VALUES (@key, @value) ON CONFLICT(key) DO UPDATE SET value = @value').run({ key: v.key, value: v.value }) },
   getSetting: { get: (k) => prepare('SELECT value FROM settings WHERE key = ?').get([k]) },
+  allSettings: { all: () => prepare('SELECT key, value FROM settings ORDER BY key').all() },
   deleteSetting: { run: (k) => prepare('DELETE FROM settings WHERE key = ?').run([k]) },
 }
 

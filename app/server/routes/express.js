@@ -3,10 +3,10 @@ const { stmts } = require('../db')
 const { broadcast } = require('../sse')
 const taobao = require('../taobao')
 const taobaoLogin = require('../taobaoLogin')
+const accounts = require('../accounts')
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ''
 
-const COOKIE_KEY = 'taobao_cookie'
 
 /**
  * 判定是否在途（只有真正在途的才导入）。
@@ -24,15 +24,14 @@ function requireAuth(req, res, next) {
   next()
 }
 
-function getCookie() {
-  const row = stmts.getSetting.get(COOKIE_KEY)
-  return row && row.value ? row.value : ''
-}
-
-function saveCookie(cookie) {
+function getAccount(id) { return id ? accounts.get('taobao', id) : null }
+function getCookie(id) { const a = getAccount(id); return a ? a.cookie : '' }
+function saveCookie(cookie, id, name) {
   const normalized = cookie.replace(/\s+/g, ' ').trim()
-  stmts.setSetting.run({ key: COOKIE_KEY, value: normalized })
-  return normalized
+  const existing = getAccount(id)
+  const account = { id: existing ? existing.id : accounts.normalizeId(id), name: name || (existing && existing.name) || `淘宝账号 ${accounts.list('taobao').length + 1}`, cookie: normalized, created_at: existing?.created_at || new Date().toISOString() }
+  accounts.save('taobao', account)
+  return account
 }
 
 /** 在途判定：先看稳定枚举，再用文案兜底 */
@@ -74,34 +73,35 @@ module.exports = function (app) {
   const router = Router()
 
   router.get('/express/status', requireAuth, (req, res) => {
-    const cookie = getCookie()
+    const list = accounts.list('taobao')
     const last = stmts.lastSync.get()
-    res.json({
-      cookie_set: !!cookie,
-      last_sync: last || null,
-    })
+    res.json({ cookie_set: list.length > 0, accounts: list.map(a => ({ id: a.id, name: a.name, cookie_set: !!a.cookie })), last_sync: last || null })
   })
 
   router.post('/express/cookie', requireAuth, (req, res) => {
-    const { cookie } = req.body
+    const { cookie, account_id, name } = req.body
     if (!cookie || !cookie.trim()) return res.status(400).json({ error: 'Cookie 不能为空' })
     if (!/_m_h5_tk=/.test(cookie)) {
       return res.status(400).json({ error: 'Cookie 中缺少 _m_h5_tk，请从淘宝页面完整复制' })
     }
-    const normalized = saveCookie(cookie)
-    res.json({ ok: true, length: normalized.length })
+    const account = saveCookie(cookie, account_id, name)
+    res.json({ ok: true, id: account.id, name: account.name, length: account.cookie.length })
   })
 
   /** 删除账号：清除已保存的淘宝 Cookie */
   router.delete('/express/cookie', requireAuth, (req, res) => {
-    stmts.deleteSetting.run(COOKIE_KEY)
+    const id = req.query.account_id || req.body?.account_id
+    if (id) accounts.remove('taobao', id)
+    else accounts.list('taobao').forEach(a => accounts.remove('taobao', a.id))
     res.json({ ok: true })
   })
 
   /** 扫码登录：生成二维码（服务端本地渲染，token 不外传） */
   router.post('/express/qrcode', requireAuth, async (req, res) => {
     try {
-      res.json(await taobaoLogin.createQr())
+      const r = await taobaoLogin.createQr()
+      r.account_id = accounts.normalizeId(req.body?.account_id)
+      res.json(r)
     } catch (e) {
       res.status(502).json({ error: e.message })
     }
@@ -113,7 +113,7 @@ module.exports = function (app) {
       const r = await taobaoLogin.pollStatus(req.params.sid)
       if (r.status !== 'CONFIRMED') return res.json({ status: r.status })
 
-      saveCookie(r.cookie)
+      saveCookie(r.cookie, req.query.account_id || req.headers['x-account-id'])
       const v = await taobaoLogin.verifyLogin(r.cookie)
       stmts.logSync.run({
         source: 'taobao_login',
@@ -130,8 +130,9 @@ module.exports = function (app) {
   })
 
   router.post('/express/sync', requireAuth, async (req, res) => {
-    const cookie = getCookie()
-    if (!cookie) return res.status(400).json({ error: '请先粘贴淘宝 Cookie' })
+    const selected = req.body?.account_id || req.query.account_id
+    const targets = selected ? [getAccount(selected)].filter(Boolean) : accounts.list('taobao')
+    if (!targets.length) return res.status(400).json({ error: '请先添加淘宝账号' })
 
     const created = []
     const skipped = []
@@ -146,10 +147,10 @@ module.exports = function (app) {
     }
 
     try {
-      for (let page = 1; page <= 3; page++) {
+      for (const account of targets) for (let page = 1; page <= 3; page++) {
         let orders
         try {
-          orders = await taobao.fetchOrders(cookie, page)
+          orders = await taobao.fetchOrders(account.cookie, page)
         } catch (e) {
           if (page === 1) throw e
           break
@@ -168,7 +169,7 @@ module.exports = function (app) {
 
           // 待发货：尚无运单号与取件码，仅入库跟踪状态
           if (isToShip(o)) {
-            commit(upsertPackage({ order_id: o.orderId, status: 'to_ship', goods_name: o.goodsName }))
+            commit(upsertPackage({ order_id: o.orderId, status: 'to_ship', goods_name: o.goodsName, source_platform: 'taobao' }))
             continue
           }
 
@@ -179,7 +180,7 @@ module.exports = function (app) {
 
           let parcel = null
           try {
-            parcel = await taobao.fetchParcel(cookie, o.orderId)
+            parcel = await taobao.fetchParcel(account.cookie, o.orderId)
           } catch (e) {
             // 单条物流页失败不影响整轮同步
           }
@@ -207,6 +208,7 @@ module.exports = function (app) {
             phone: parcel.phone || '',
             address: parcel.station || '',
             goods_name: o.goodsName,
+            source_platform: 'taobao',
           }))
         }
         if (orders.length < 10) break
@@ -225,8 +227,9 @@ module.exports = function (app) {
 
   /** 刷新取件码/驿站/收件人：按订单号重取淘宝 SSR 物流页（无第三方依赖） */
   router.post('/express/fill-codes', requireAuth, async (req, res) => {
-    const cookie = getCookie()
-    if (!cookie) return res.status(400).json({ error: '请先扫码登录淘宝' })
+    const selected = req.body?.account_id || req.query.account_id
+    const targets = selected ? [getAccount(selected)].filter(Boolean) : accounts.list('taobao')
+    if (!targets.length) return res.status(400).json({ error: '请先添加淘宝账号' })
 
     const rows = stmts.withOrderId.all()
     if (rows.length === 0) {
@@ -237,14 +240,15 @@ module.exports = function (app) {
     const missed = []
     for (const row of rows) {
       let parcel = null
-      try {
-        parcel = await taobao.fetchParcel(cookie, row.order_id)
-      } catch (e) {
-        missed.push({ id: row.id, mail_no: row.mail_no, reason: e.message })
-        continue
+      let lastError = null
+      for (const account of targets) {
+        try {
+          parcel = await taobao.fetchParcel(account.cookie, row.order_id)
+          if (parcel) break
+        } catch (e) { lastError = e }
       }
       if (!parcel) {
-        missed.push({ id: row.id, mail_no: row.mail_no, reason: '未取到物流数据（登录态或订单可能已变化）' })
+        missed.push({ id: row.id, mail_no: row.mail_no, reason: lastError?.message || '未取到物流数据（登录态或订单可能已变化）' })
         continue
       }
       const code = parcel.pickupCode || ''
