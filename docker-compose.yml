@@ -1,0 +1,23 @@
+services:
+  pickup-codes:
+    build:
+      context: .
+    image: ghcr.io/yunxi-fi/pickup-code-display:latest
+    container_name: pickup-codes
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      TZ: Asia/Shanghai
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SESSION_DURATION_HOURS: ${SESSION_DURATION_HOURS:-12}
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+      SILICONFLOW_MODEL: ${SILICONFLOW_MODEL:-Qwen/Qwen3.6-27B}
+    volumes:
+      # 数据库文件（data.db）持久化到宿主机 ./data
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
