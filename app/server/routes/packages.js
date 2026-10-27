@@ -1,6 +1,7 @@
 const { Router } = require('express')
 const { stmts } = require('../db')
 const { broadcast, addClient } = require('../sse')
+const settings = require('../settings')
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ''
 const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY || ''
@@ -29,7 +30,10 @@ module.exports = function (app) {
 
   router.get('/packages', (req, res) => {
     const { status } = req.query
-    res.json(status ? stmts.all.all() : stmts.pending.all())
+    const rows = status ? stmts.all.all() : stmts.pending.all()
+    // 「代取快递」被隐藏时不下发（数据仍保留在库中）
+    const { showProxy, keywords } = settings.getDisplaySettings()
+    res.json(showProxy ? rows : rows.filter(r => !settings.isProxyRow(r, keywords)))
   })
 
   router.get('/history', (req, res) => {
@@ -57,10 +61,33 @@ module.exports = function (app) {
     res.json(row)
   })
 
-  router.patch('/packages/:id/restore', requireAuth, (req, res) => {
+  /** 撤回取件：展示页的「撤回」与后台共用。取件接口本身不鉴权，撤回保持一致 */
+  router.patch('/packages/:id/restore', (req, res) => {
     const { id } = req.params
     const info = stmts.restore.run(id)
     if (info.changes === 0) return res.status(404).json({ error: '包裹不存在或未取件' })
+    const row = stmts.getById.get(id)
+    broadcast('update', row)
+    res.json(row)
+  })
+
+  /** 编辑包裹：全量覆盖字段，空值即清空（区别于同步接口的「非空才覆盖」） */
+  router.patch('/packages/:id', requireAuth, (req, res) => {
+    const { id } = req.params
+    const { pickup_code, company, recipient, phone, address } = req.body
+    if (!pickup_code || !String(pickup_code).trim()) {
+      return res.status(400).json({ error: '取件码不能为空' })
+    }
+    if (!stmts.getById.get(id)) return res.status(404).json({ error: '包裹不存在' })
+
+    stmts.updatePackage.run({
+      id,
+      pickup_code: String(pickup_code).trim(),
+      company,
+      recipient,
+      phone,
+      address,
+    })
     const row = stmts.getById.get(id)
     broadcast('update', row)
     res.json(row)

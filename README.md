@@ -3,7 +3,7 @@
 > 一款面向飞牛 fnOS 的快递取件码管理系统，支持**手动录入**、**AI 拍照识别**与**淘宝 / 拼多多订单自动采集**，提供实时大屏展示、分组视图与状态管理，适用于驿站、代收点等场景。
 
 - 应用标识：`pickup.codes`
-- 当前版本：`1.2.3`
+- 当前版本：`1.3.1`
 - 开源仓库：[YUNXI-fi/Pickup-Code-Display](https://github.com/YUNXI-fi/Pickup-Code-Display)
 - 维护者：YUNXI
 

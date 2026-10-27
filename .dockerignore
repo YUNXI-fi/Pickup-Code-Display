@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+*.fpk
+*.md
+design
+.trae-html-share-packages
+Dockerfile
+.dockerignore
+
+# 运行期数据与本地配置
+app/server/node_modules
+app/server/data.db
+app/server/.env
+app/server/.env.*

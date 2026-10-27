@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>移动端 UI 优化设计稿 v2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: { colors: { primary: '#2563eb', page: '#f6f7f9' } } } }
+</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+  .ico { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .code-font { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .card-shadow { box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06); }
+  .frame-shadow { box-shadow: 0 26px 60px -28px rgba(16,24,40,.35), 0 6px 16px rgba(16,24,40,.08); }
+  .sheet-shadow { box-shadow: 0 -10px 30px -12px rgba(16,24,40,.25); }
+</style>
+</head>
+<body class="bg-[#eef0f4] text-gray-900 antialiased">
+
+<svg class="hidden" aria-hidden="true">
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="m21 7-9-5-9 5v10l9 5 9-5V7Z"/><path d="m3 7 9 5 9-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.5 14.6a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.3a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.2A1.7 1.7 0 0 0 4.4 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.3a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1.1Z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M16.9 3.9a2.1 2.1 0 0 1 3 3L8 18.8l-4 1 1-4L16.9 3.9Z"/><path d="m14.5 6.3 3.2 3.2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6.5 7 7.6 20h8.8L17.5 7"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 15v3.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V15"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.6 17.4A2 2 0 0 0 4.3 20.4h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24"><path d="M4 18v-3M9 18v-6M14 18v-9M19 18V6" stroke-width="2.4"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 26 24"><rect x="2" y="8" width="18" height="8" rx="2.4"/><path d="M23 11v2"/></symbol>
+</svg>
+
+<div class="max-w-[1240px] mx-auto px-5 lg:px-8 py-10">
+
+  <!-- 标题 -->
+  <header class="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-10">
+    <div>
+      <span class="inline-flex items-center gap-2 text-[11px] tracking-[.12em] font-semibold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1 card-shadow">MOBILE UI · V2</span>
+      <h1 class="text-2xl lg:text-[28px] font-bold mt-4">移动端 UI 优化设计稿</h1>
+      <p class="text-sm text-gray-500 mt-2.5 max-w-2xl leading-relaxed">覆盖展示页与管理页两块移动端界面，重点在视觉打磨、信息层级与操作路径。沿用现有主色 <span class="code-font text-gray-700">#2563eb</span> 与 Tailwind 体系，本稿仅示意、未实现。</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <span class="h-9 px-3 rounded-xl bg-white border border-gray-200 text-xs text-gray-600 flex items-center gap-1.5 card-shadow">390 × 780</span>
+      <span class="h-9 px-3 rounded-xl bg-white border border-gray-200 text-xs text-gray-600 flex items-center gap-1.5 card-shadow">展示页 2 屏</span>
+      <span class="h-9 px-3 rounded-xl bg-white border border-gray-200 text-xs text-gray-600 flex items-center gap-1.5 card-shadow">管理页 2 屏</span>
+    </div>
+  </header>
+
+  <!-- 设计原则 -->
+  <section class="grid md:grid-cols-3 gap-4 mb-12">
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+      <h3 class="text-sm font-semibold mb-2">视觉打磨</h3>
+      <p class="text-xs text-gray-500 leading-relaxed">统一圆角与间距；弱化装饰元素（分组色条、重复图标），把对比度留给取件码与主操作。</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+      <h3 class="text-sm font-semibold mb-2">信息层级</h3>
+      <p class="text-xs text-gray-500 leading-relaxed">取件码第一优先，其次收件人，最后才是地址与快递号；地址按分组标题出现，卡片内不重复。</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+      <h3 class="text-sm font-semibold mb-2">操作路径</h3>
+      <p class="text-xs text-gray-500 leading-relaxed">常用操作前置到卡片；工具栏收成一行；取件后提供 5 秒撤回，降低误触成本。</p>
+    </div>
+  </section>
+
+  <!-- 01 展示页 -->
+  <div class="flex items-center gap-3 mb-6">
+    <span class="w-7 h-7 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center">01</span>
+    <h2 class="text-base font-semibold">展示页 · 移动端</h2>
+    <span class="h-px flex-1 bg-gray-200"></span>
+    <span class="text-xs text-gray-400">index.html</span>
+  </div>
+
+  <div class="grid xl:grid-cols-[390px_minmax(0,1fr)] gap-8 items-start mb-14">
+
+    <!-- 屏幕 A -->
+    <div class="w-[390px] shrink-0 rounded-[42px] bg-gray-900 p-[10px] frame-shadow">
+      <div class="w-full h-[780px] rounded-[34px] bg-page overflow-hidden flex flex-col relative">
+
+        <div class="flex items-center justify-between px-6 pt-3 pb-1 text-[11px] font-medium">
+          <span>12:41</span>
+          <span class="flex items-center gap-1.5 text-gray-700">
+            <svg class="ico w-4 h-3.5"><use href="#i-signal"/></svg>
+            <svg class="ico w-5 h-3.5"><use href="#i-battery"/></svg>
+          </span>
+        </div>
+
+        <!-- 头部 -->
+        <div class="flex items-center gap-2.5 px-4 py-3">
+          <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"><svg class="ico w-4 h-4"><use href="#i-box"/></svg></span>
+          <div class="min-w-0 flex-1">
+            <h1 class="text-[15px] font-bold leading-tight">取件码展示</h1>
+            <p class="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-emerald-500"></span>实时同步中</p>
+          </div>
+          <span class="h-8 px-3 rounded-full bg-white border border-emerald-200 text-emerald-600 text-xs font-semibold flex items-center gap-1">
+            待取 <span class="code-font">3</span>
+          </span>
+        </div>
+
+        <!-- 吸顶工具栏 -->
+        <div class="px-4 pb-2.5 flex items-center gap-2">
+          <div class="flex-1 flex rounded-xl bg-white border border-gray-200 p-0.5 card-shadow">
+            <button class="flex-1 h-8 rounded-[10px] bg-primary text-white text-[13px] font-medium">待取 <span class="opacity-80 code-font">3</span></button>
+            <button class="flex-1 h-8 rounded-[10px] text-[13px] font-medium text-gray-500">已取 <span class="opacity-60 code-font">2</span></button>
+          </div>
+          <button class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 card-shadow" aria-label="分组方式">
+            <svg class="ico w-4 h-4"><use href="#i-filter"/></svg>
+          </button>
+        </div>
+
+        <!-- 分组 -->
+        <div class="flex-1 overflow-y-auto pb-6">
+          <div class="flex items-center gap-2 px-4 mt-1 mb-2">
+            <svg class="ico w-3.5 h-3.5 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg>
+            <h2 class="text-[13px] font-semibold truncate">北流市新圩镇旺山村物流服务站</h2>
+            <span class="ml-auto text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0">2 件待取</span>
+          </div>
+
+          <div class="px-4 space-y-2.5">
+            <!-- 卡片 1 -->
+            <div class="bg-white rounded-2xl border border-gray-200 card-shadow p-4">
+              <div class="flex items-center gap-3">
+                <p class="flex-1 min-w-0 truncate code-font text-[30px] font-bold tracking-wider leading-none">1-13-6119</p>
+                <button class="h-10 px-4 rounded-xl bg-primary text-white text-[13px] font-medium flex-shrink-0">取件</button>
+              </div>
+              <p class="mt-2 text-[13px] text-gray-500 flex items-center gap-1.5">
+                <span class="truncate">慕**</span><span class="text-gray-300">·</span><span class="flex-shrink-0">尾号 6492</span>
+              </p>
+              <div class="mt-2.5 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                <span class="code-font truncate">JT5539335292381</span>
+                <span class="flex items-center gap-1 flex-shrink-0"><svg class="ico w-3 h-3"><use href="#i-clock"/></svg>更新 10-27 10:35</span>
+              </div>
+            </div>
+
+            <!-- 卡片 2：无码 -->
+            <div class="bg-white rounded-2xl border border-gray-200 card-shadow p-4">
+              <div class="flex items-center gap-3">
+                <p class="flex-1 min-w-0 truncate text-base font-medium text-gray-400 leading-none">未获取到取件码</p>
+                <button class="h-10 px-4 rounded-xl bg-primary text-white text-[13px] font-medium flex-shrink-0">取件</button>
+              </div>
+              <p class="mt-2 text-[13px] text-gray-500 flex items-center gap-1.5">
+                <span class="truncate">黄**</span><span class="text-gray-300">·</span><span class="flex-shrink-0">尾号 8817</span>
+              </p>
+              <div class="mt-2.5 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                <span class="code-font truncate">9840474301980</span>
+                <span class="flex items-center gap-1 flex-shrink-0"><svg class="ico w-3 h-3"><use href="#i-clock"/></svg>更新 10-27 12:04</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 第二个分组 -->
+          <div class="flex items-center gap-2 px-4 mt-4 mb-2">
+            <svg class="ico w-3.5 h-3.5 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg>
+            <h2 class="text-[13px] font-semibold truncate">天誉半岛 2 栋 118 号拼多多驿站</h2>
+            <span class="ml-auto text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0">1 件待取</span>
+          </div>
+          <div class="px-4">
+            <div class="bg-white rounded-2xl border border-gray-200 card-shadow p-4">
+              <div class="flex items-center gap-3">
+                <p class="flex-1 min-w-0 truncate code-font text-[30px] font-bold tracking-wider leading-none">6-3-4170</p>
+                <button class="h-10 px-4 rounded-xl bg-primary text-white text-[13px] font-medium flex-shrink-0">取件</button>
+              </div>
+              <p class="mt-2 text-[13px] text-gray-500 flex items-center gap-1.5">
+                <span class="truncate">慕**</span><span class="text-gray-300">·</span><span class="flex-shrink-0">尾号 6492</span>
+              </p>
+              <div class="mt-2.5 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                <span class="code-font truncate">YT7648951609651</span>
+                <span class="flex items-center gap-1 flex-shrink-0"><svg class="ico w-3 h-3"><use href="#i-clock"/></svg>更新 10-27 09:52</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 撤回提示 -->
+        <div class="absolute left-4 right-4 bottom-6 h-11 rounded-xl bg-gray-900/92 text-white flex items-center px-4 gap-3 shadow-lg">
+          <span class="text-[13px] flex-1">已标记取件</span>
+          <span class="text-[13px] font-medium flex items-center gap-1"><svg class="ico w-3.5 h-3.5"><use href="#i-undo"/></svg>撤回</span>
+        </div>
+        <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full bg-gray-900/20"></div>
+      </div>
+    </div>
+
+    <!-- 说明 A -->
+    <div class="space-y-4">
+      <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+        <h3 class="text-sm font-semibold mb-3">屏幕 A · 待取件（按地址分组）</h3>
+        <ol class="space-y-3 text-xs text-gray-600 leading-relaxed">
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">1</span><span>顶部只保留「待取 N」胶囊，去掉独立计数块，头部高度从 76px 降到 56px。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">2</span><span>筛选与分组合并成一行：左分段、右图标入口（点开底部菜单选「按地址 / 按取件情况」），吸顶高度固定 56px。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">3</span><span>卡片信息重排：取件码最大，收件人第二，底部一行放快递号与更新时间；按地址分组时不再重复地址。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">4</span><span>取件按钮高度 40px，与取件码同行；点击后立即置灰并弹出「已标记取件 · 撤回」，5 秒内可撤销。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">5</span><span>丰巢等无码包裹保留明确占位文案，按钮仍可标记取件，避免用户以为页面异常。</span></li>
+        </ol>
+      </div>
+
+      <!-- 屏幕 B -->
+      <div class="flex flex-wrap gap-6 items-start">
+        <div class="w-[390px] shrink-0 rounded-[42px] bg-gray-900 p-[10px] frame-shadow">
+          <div class="w-full h-[780px] rounded-[34px] bg-page overflow-hidden flex flex-col relative">
+            <div class="flex items-center justify-between px-6 pt-3 pb-1 text-[11px] font-medium">
+              <span>12:41</span>
+              <span class="flex items-center gap-1.5 text-gray-700">
+                <svg class="ico w-4 h-3.5"><use href="#i-signal"/></svg>
+                <svg class="ico w-5 h-3.5"><use href="#i-battery"/></svg>
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2.5 px-4 py-3">
+              <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"><svg class="ico w-4 h-4"><use href="#i-box"/></svg></span>
+              <div class="min-w-0 flex-1">
+                <h1 class="text-[15px] font-bold leading-tight">取件码展示</h1>
+                <p class="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-emerald-500"></span>实时同步中</p>
+              </div>
+              <span class="h-8 px-3 rounded-full bg-white border border-emerald-200 text-emerald-600 text-xs font-semibold flex items-center gap-1">
+                待取 <span class="code-font">1</span>
+              </span>
+            </div>
+
+            <div class="px-4 pb-2.5 flex items-center gap-2">
+              <div class="flex-1 flex rounded-xl bg-white border border-gray-200 p-0.5 card-shadow">
+                <button class="flex-1 h-8 rounded-[10px] text-[13px] font-medium text-gray-500">待取 <span class="opacity-60 code-font">1</span></button>
+                <button class="flex-1 h-8 rounded-[10px] bg-primary text-white text-[13px] font-medium">已取 <span class="opacity-80 code-font">2</span></button>
+              </div>
+              <button class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 card-shadow" aria-label="分组方式">
+                <svg class="ico w-4 h-4"><use href="#i-filter"/></svg>
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto">
+              <div class="flex items-center gap-2 px-4 mt-1 mb-2">
+                <svg class="ico w-3.5 h-3.5 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg>
+                <h2 class="text-[13px] font-semibold truncate">天誉半岛 2 栋 118 号拼多多驿站</h2>
+                <span class="ml-auto text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0">2 件 · 1 件已取</span>
+              </div>
+
+              <div class="mx-4 bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+                <!-- 折叠行 -->
+                <div class="flex items-center gap-3 px-4 py-3">
+                  <span class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0"><svg class="ico w-4 h-4"><use href="#i-check"/></svg></span>
+                  <div class="flex-1 min-w-0">
+                    <p class="code-font text-base font-semibold text-gray-400 line-through decoration-gray-300 tracking-wide truncate">6-3-4170</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">已取 10-27 11:02</p>
+                  </div>
+                  <svg class="ico w-4 h-4 text-gray-300 flex-shrink-0"><use href="#i-chevron-down"/></svg>
+                </div>
+
+                <!-- 展开行 -->
+                <div class="px-4 py-3 bg-gray-50/60">
+                  <div class="flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0"><svg class="ico w-4 h-4"><use href="#i-check"/></svg></span>
+                    <div class="flex-1 min-w-0">
+                      <p class="code-font text-base font-semibold text-gray-400 line-through decoration-gray-300 tracking-wide truncate">0-1-5422</p>
+                      <p class="text-[11px] text-gray-400 mt-0.5">已取 10-27 09:31</p>
+                    </div>
+                    <svg class="ico w-4 h-4 text-gray-400 flex-shrink-0 rotate-180"><use href="#i-chevron-down"/></svg>
+                  </div>
+                  <div class="mt-3 pl-11 space-y-1.5 text-[11px] text-gray-500">
+                    <p class="flex items-center gap-1.5"><svg class="ico w-3 h-3 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg><span class="truncate">天誉半岛 2 栋 118 号拼多多驿站</span></p>
+                    <p class="code-font text-gray-400">SF1234567890123</p>
+                    <p class="text-gray-400">收件人 慕** · 尾号 6492</p>
+                  </div>
+                </div>
+              </div>
+
+              <p class="px-4 mt-4 text-[11px] text-gray-400">当天已取件默认折叠，只保留取件码与取走时间，点击展开详情。</p>
+            </div>
+            <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full bg-gray-900/20"></div>
+          </div>
+        </div>
+
+        <div class="flex-1 min-w-[280px] bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+          <h3 class="text-sm font-semibold mb-3">屏幕 B · 当天已取件</h3>
+          <ol class="space-y-3 text-xs text-gray-600 leading-relaxed">
+            <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">1</span><span>已取件不再使用整张大卡片，折叠成 56px 紧凑行，减少已完成信息的视觉噪音。</span></li>
+            <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">2</span><span>点击行展开地址、快递号、收件人；默认只显示码与取走时间。</span></li>
+            <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">3</span><span>同组内已取件放进单独的白色面板，用分隔线代替每张卡片的描边。</span></li>
+            <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">4</span><span>「已取」筛选只保留当天数据，与现有逻辑一致，避免历史堆积。</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 管理页 -->
+  <div class="flex items-center gap-3 mb-6">
+    <span class="w-7 h-7 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center">02</span>
+    <h2 class="text-base font-semibold">管理页 · 移动端</h2>
+    <span class="h-px flex-1 bg-gray-200"></span>
+    <span class="text-xs text-gray-400">admin.html</span>
+  </div>
+
+  <div class="flex flex-wrap xl:flex-nowrap gap-8 items-start mb-14">
+
+    <!-- 屏幕 C -->
+    <div class="w-[390px] shrink-0 rounded-[42px] bg-gray-900 p-[10px] frame-shadow">
+      <div class="w-full h-[780px] rounded-[34px] bg-page overflow-hidden flex flex-col relative">
+        <div class="flex items-center justify-between px-6 pt-3 pb-1 text-[11px] font-medium">
+          <span>12:41</span>
+          <span class="flex items-center gap-1.5 text-gray-700">
+            <svg class="ico w-4 h-3.5"><use href="#i-signal"/></svg>
+            <svg class="ico w-5 h-3.5"><use href="#i-battery"/></svg>
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2 px-4 pt-2 pb-3">
+          <div class="min-w-0 flex-1">
+            <h1 class="text-[17px] font-bold leading-tight">取件码管理</h1>
+            <p class="text-[11px] text-gray-400 mt-0.5">共 12 条记录</p>
+          </div>
+          <button class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 card-shadow" aria-label="更新快递"><svg class="ico w-4 h-4"><use href="#i-refresh"/></svg></button>
+          <button class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 card-shadow" aria-label="账号管理"><svg class="ico w-4 h-4"><use href="#i-gear"/></svg></button>
+        </div>
+
+        <!-- 筛选 -->
+        <div class="px-4 pb-2.5 flex gap-2 overflow-x-auto">
+          <span class="h-8 px-3 rounded-full bg-gray-900 text-white text-xs font-medium flex items-center gap-1 flex-shrink-0">全部 <span class="opacity-70 code-font">12</span></span>
+          <span class="h-8 px-3 rounded-full bg-white border border-gray-200 text-gray-600 text-xs font-medium flex items-center gap-1 flex-shrink-0">运输中 <span class="text-gray-400 code-font">1</span></span>
+          <span class="h-8 px-3 rounded-full bg-white border border-gray-200 text-gray-600 text-xs font-medium flex items-center gap-1 flex-shrink-0">待取件 <span class="text-gray-400 code-font">9</span></span>
+          <span class="h-8 px-3 rounded-full bg-white border border-gray-200 text-gray-600 text-xs font-medium flex items-center gap-1 flex-shrink-0">已取件 <span class="text-gray-400 code-font">2</span></span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pb-24">
+          <!-- 左滑提示 -->
+          <div class="mx-4 mb-2 flex items-center gap-2 text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <svg class="ico w-3.5 h-3.5 flex-shrink-0"><use href="#i-alert"/></svg>
+            <span>左滑卡片可编辑或删除</span>
+          </div>
+
+          <div class="mx-4 bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+            <!-- 已左滑露出操作 -->
+            <div class="relative overflow-hidden">
+              <div class="absolute inset-y-0 right-0 flex">
+                <div class="w-[72px] bg-amber-500 flex flex-col items-center justify-center gap-1">
+                  <svg class="ico w-5 h-5 text-white"><use href="#i-edit"/></svg>
+                  <span class="text-[10px] font-medium text-white">编辑</span>
+                </div>
+                <div class="w-[72px] bg-red-500 flex flex-col items-center justify-center gap-1">
+                  <svg class="ico w-5 h-5 text-white"><use href="#i-trash"/></svg>
+                  <span class="text-[10px] font-medium text-white">删除</span>
+                </div>
+              </div>
+              <div class="relative bg-white p-4 -translate-x-[96px]">
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">待取件</span>
+                  <span class="ml-auto text-[11px] text-gray-400 code-font">10-27 12:37</span>
+                </div>
+                <p class="mt-2 code-font text-2xl font-bold tracking-wide leading-none">X-3-5080</p>
+                <p class="mt-2 text-[13px] text-gray-500 truncate flex items-center gap-1.5">
+                  <svg class="ico w-3.5 h-3.5 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg>文武街 121 号 105 路公交车后面第二个路口斜对面
+                </p>
+                <p class="mt-1 text-[11px] text-gray-400 truncate">新圩镇文武街 121 号极兔快递</p>
+              </div>
+            </div>
+
+            <!-- 普通行 -->
+            <div class="p-4">
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">待取件</span>
+                <span class="ml-auto text-[11px] text-gray-400 code-font">10-27 12:08</span>
+              </div>
+              <p class="mt-2 code-font text-2xl font-bold tracking-wide leading-none">D号柜 3524 97</p>
+              <p class="mt-2 text-[13px] text-gray-500 truncate flex items-center gap-1.5">
+                <svg class="ico w-3.5 h-3.5 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg>玉林万盛中央公馆 6 栋 3 号店
+              </p>
+              <p class="mt-1 text-[11px] text-gray-400 truncate">菜鸟驿站</p>
+            </div>
+
+            <div class="p-4">
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">运输中</span>
+                <span class="ml-auto text-[11px] text-gray-400 code-font">10-27 10:35</span>
+              </div>
+              <p class="mt-2 text-base font-medium text-gray-700 leading-snug line-clamp-1">【加厚】日式抽屉式收纳箱可叠加</p>
+              <p class="mt-2 text-[13px] text-gray-500 truncate flex items-center gap-1.5">
+                <svg class="ico w-3.5 h-3.5 text-gray-400 flex-shrink-0"><use href="#i-pin"/></svg>预计 10-28 到达南宁市
+              </p>
+              <p class="mt-1 text-[11px] text-gray-400 truncate">邮政快递包裹 · 9840474301980</p>
+            </div>
+          </div>
+        </div>
+
+        <button class="absolute bottom-6 right-4 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center" aria-label="添加快递">
+          <svg class="ico w-6 h-6"><use href="#i-plus"/></svg>
+        </button>
+        <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full bg-gray-900/20"></div>
+      </div>
+    </div>
+
+    <!-- 说明 C -->
+    <div class="flex-1 min-w-[280px] space-y-4">
+      <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+        <h3 class="text-sm font-semibold mb-3">屏幕 C · 快递列表</h3>
+        <ol class="space-y-3 text-xs text-gray-600 leading-relaxed">
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">1</span><span>筛选条吸顶，数量徽标跟随筛选；「运输中」用蓝色而非灰色，和展示页状态色一致。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">2</span><span>卡片两层信息：第一层状态 + 更新时间，第二层取件码/商品，第三层地址与快递公司。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">3</span><span>首次进入显示「左滑可编辑或删除」提示条，用户左滑一次后写入 localStorage，不再出现。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">4</span><span>列表底部留 96px，避免悬浮添加按钮遮住最后一条；按钮位置适配安全区。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">5</span><span>账号管理沿用已定稿的独立设计，不再重复改：<span class="code-font text-[10px]">design/account-modal-redesign.html</span>。</span></li>
+        </ol>
+      </div>
+
+      <!-- 屏幕 D -->
+      <div class="w-[390px] max-w-full rounded-[42px] bg-gray-900 p-[10px] frame-shadow">
+        <div class="w-full h-[780px] rounded-[34px] bg-page overflow-hidden flex flex-col relative">
+          <div class="flex-1 bg-gray-900/35"></div>
+          <div class="rounded-t-3xl bg-white sheet-shadow">
+            <div class="pt-2.5 pb-1 flex justify-center"><span class="w-10 h-1 rounded-full bg-gray-300"></span></div>
+            <div class="flex items-center justify-between px-5 py-2.5">
+              <h2 class="text-base font-semibold">添加快递</h2>
+              <span class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400"><svg class="ico w-4 h-4"><use href="#i-x"/></svg></span>
+            </div>
+
+            <div class="px-5 space-y-3">
+              <div class="flex items-center gap-2.5 rounded-xl bg-primary/5 border border-primary/20 px-3.5 py-3">
+                <svg class="ico w-5 h-5 text-primary flex-shrink-0"><use href="#i-upload"/></svg>
+                <span class="flex-1">
+                  <span class="block text-sm font-medium text-primary">上传截图识别</span>
+                  <span class="block text-[11px] text-primary/70 mt-0.5">驿站小票或快递柜屏幕，自动填表</span>
+                </span>
+                <svg class="ico w-4 h-4 text-primary/50"><use href="#i-upload"/></svg>
+              </div>
+
+              <label class="block">
+                <span class="text-xs text-gray-500 mb-1.5 block">取件码 <span class="text-red-500">*</span></span>
+                <input readonly value="X-3-5080" class="h-11 w-full rounded-xl border border-gray-300 px-3.5 text-sm code-font bg-white outline-none">
+              </label>
+
+              <div class="grid grid-cols-2 gap-3">
+                <label class="block">
+                  <span class="text-xs text-gray-500 mb-1.5 block">收件人 <span class="text-red-500">*</span></span>
+                  <input readonly value="慕**" class="h-11 w-full rounded-xl border border-gray-300 px-3.5 text-sm bg-white outline-none">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500 mb-1.5 block">手机尾号 <span class="text-red-500">*</span></span>
+                  <input readonly value="6492" class="h-11 w-full rounded-xl border border-gray-300 px-3.5 text-sm code-font bg-white outline-none">
+                </label>
+              </div>
+
+              <label class="block">
+                <span class="text-xs text-gray-500 mb-1.5 block">取件地址 <span class="text-red-500">*</span></span>
+                <input readonly value="文武街 121 号极兔快递" class="h-11 w-full rounded-xl border border-gray-300 px-3.5 text-sm bg-white outline-none">
+              </label>
+
+              <label class="block">
+                <span class="text-xs text-gray-500 mb-1.5 block">快递公司</span>
+                <input readonly value="极兔速递" class="h-11 w-full rounded-xl border border-gray-300 px-3.5 text-sm bg-white outline-none">
+              </label>
+            </div>
+
+            <div class="px-5 py-4 flex gap-2">
+              <button class="h-12 flex-1 rounded-xl bg-primary text-white text-sm font-medium">添加</button>
+            </div>
+            <div class="pb-2 flex justify-center"><span class="w-28 h-1 rounded-full bg-gray-900/20"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+        <h3 class="text-sm font-semibold mb-3">屏幕 D · 添加快递</h3>
+        <ol class="space-y-3 text-xs text-gray-600 leading-relaxed">
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">1</span><span>截图识别入口固定在表单最上方，识别成功后自动填充并高亮，减少手动输入。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">2</span><span>收件人与手机尾号并排两列，其余字段单列，整体高度压缩到一屏内。</span></li>
+          <li class="flex gap-2.5"><span class="w-5 h-5 rounded-md bg-gray-100 text-[10px] font-bold flex items-center justify-center flex-shrink-0">3</span><span>主操作固定在抽屉底部，键盘弹起时随之上移，不被遮挡。</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 规范 -->
+  <div class="flex items-center gap-3 mb-5">
+    <span class="w-7 h-7 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center">03</span>
+    <h2 class="text-base font-semibold">规范速查</h2>
+    <span class="h-px flex-1 bg-gray-200"></span>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-4 mb-10">
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+      <h3 class="text-sm font-semibold mb-3">尺寸</h3>
+      <table class="w-full text-xs text-gray-600">
+        <tbody class="[&>tr>td]:py-2">
+          <tr><td class="text-gray-400">页面左右留白</td><td class="text-right code-font">16</td></tr>
+          <tr><td class="text-gray-400">卡片内边距</td><td class="text-right code-font">16</td></tr>
+          <tr><td class="text-gray-400">卡片圆角</td><td class="text-right code-font">16 / 12</td></tr>
+          <tr><td class="text-gray-400">主按钮高度</td><td class="text-right code-font">40 / 48</td></tr>
+          <tr><td class="text-gray-400">吸顶工具栏</td><td class="text-right code-font">56</td></tr>
+          <tr><td class="text-gray-400">最小触控区</td><td class="text-right code-font">44 × 44</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+      <h3 class="text-sm font-semibold mb-3">色彩</h3>
+      <ul class="space-y-2.5 text-xs text-gray-600">
+        <li class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-primary"></span>主色 <span class="code-font text-gray-400 ml-auto">#2563eb</span></li>
+        <li class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-emerald-500"></span>待取件 <span class="code-font text-gray-400 ml-auto">emerald-600</span></li>
+        <li class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-blue-500"></span>运输中 <span class="code-font text-gray-400 ml-auto">blue-600</span></li>
+        <li class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-gray-300"></span>已取件 <span class="code-font text-gray-400 ml-auto">gray-400</span></li>
+        <li class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-amber-500"></span>编辑 / 提示 <span class="code-font text-gray-400 ml-auto">amber-500</span></li>
+        <li class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-red-500"></span>删除 <span class="code-font text-gray-400 ml-auto">red-500</span></li>
+      </ul>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 card-shadow">
+      <h3 class="text-sm font-semibold mb-3">交互</h3>
+      <ul class="space-y-2.5 text-xs text-gray-600 leading-relaxed">
+        <li>状态反馈 150–200ms，按钮按下 90ms 缩放反馈。</li>
+        <li>取件后乐观更新，5 秒撤回条；撤回即恢复原状态。</li>
+        <li>吸顶区始终使用页面底色，避免内容穿透。</li>
+        <li>底部操作区加 16px 安全区留白。</li>
+        <li>状态不以颜色单独表达，均配文字。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 变更清单 -->
+  <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden card-shadow mb-8">
+    <div class="px-6 py-4 border-b border-gray-100"><h3 class="text-sm font-semibold">相对现状的变更清单</h3></div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50/70 text-xs text-gray-500">
+        <tr>
+          <th class="text-left font-medium px-6 py-3">页面</th>
+          <th class="text-left font-medium px-6 py-3">现状</th>
+          <th class="text-left font-medium px-6 py-3">改版</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 text-gray-600">
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">展示页 · 头部</td><td class="px-6 py-3">标题 + 独立待取数字块</td><td class="px-6 py-3">标题 + 待取胶囊，高度 56</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">展示页 · 工具栏</td><td class="px-6 py-3">分组切换 + 筛选两行</td><td class="px-6 py-3">一行：分段筛选 + 分组图标菜单</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">展示页 · 待取卡片</td><td class="px-6 py-3">码 + 收件人 + 快递号 + 地址 + 时间</td><td class="px-6 py-3">码 + 收件人 + 快递号 + 更新时间；地址归分组标题</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">展示页 · 已取件</td><td class="px-6 py-3">与待取同样大小的卡片</td><td class="px-6 py-3">56px 折叠行，点击展开详情</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">展示页 · 取件</td><td class="px-6 py-3">点击即标记，无撤销</td><td class="px-6 py-3">乐观更新 + 5 秒撤回</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">管理页 · 筛选</td><td class="px-6 py-3">非吸顶，滚动后不可见</td><td class="px-6 py-3">筛选条吸顶</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">管理页 · 左滑</td><td class="px-6 py-3">无提示，靠猜测</td><td class="px-6 py-3">首次进入提示一次</td></tr>
+        <tr><td class="px-6 py-3 text-gray-900 whitespace-nowrap">管理页 · 添加</td><td class="px-6 py-3">截图入口在表单中段</td><td class="px-6 py-3">提到表单最上方，主按钮固定底部</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="text-xs text-gray-400 text-center">设计稿 v2 · 已保留 v1 为 <span class="code-font">design/ui-draft-v1.html</span>；确认后我再改代码。</p>
+</div>
+</body>
+</html>

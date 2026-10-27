@@ -32,8 +32,8 @@ function accumulateCookies(cookieStr, headers) {
   return out
 }
 
-/** mtop 通用调用：先刷 _m_h5_tk token，再算 wapSign */
-async function mtopCall(cookies, api, v, dataObj, host) {
+/** mtop 通用调用：先刷 _m_h5_tk token，再算 wapSign。opts:{method:'GET'|'POST',json:boolean} */
+async function mtopCall(cookies, api, v, dataObj, host, opts = {}) {
   const base = `https://${host}/h5/${api}/${v}/`
   const headers = {
     'User-Agent': UA,
@@ -65,14 +65,29 @@ async function mtopCall(cookies, api, v, dataObj, host) {
   const dataRaw = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj)
   const sign = md5(`${token}&${t}&${APPKEY}&${dataRaw}`)
 
-  const url = `${base}?jsv=2.3.18&appKey=${APPKEY}&t=${t}&sign=${sign}&type=jsonp&dataType=jsonp&data=${encodeURIComponent(dataRaw)}`
-  const resp = await fetch(url, { headers: { ...headers, Cookie: ck }, signal: AbortSignal.timeout(TIMEOUT) })
+  let resp
+  if (opts.method === 'POST') {
+    // PC 端接口（type=originaljson）：data 放 body，可拿到含取件码的完整 cell 树；
+    // 必须带 ttid=201200@taobao_iphone_99.99.99，否则报「服务内部故障」
+    const url = `${base}?jsv=2.7.2&appKey=${APPKEY}&t=${t}&sign=${sign}&v=${v}&ecode=1&timeout=8000&dataType=json&valueType=original&ttid=201200%40taobao_iphone_99.99.99&needLogin=true&type=originaljson&isHttps=1&needRetry=true&api=${api}&preventFallback=true`
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: { ...headers, Cookie: ck, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'data=' + encodeURIComponent(dataRaw),
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+  } else {
+    const url = `${base}?jsv=2.3.18&appKey=${APPKEY}&t=${t}&sign=${sign}&type=jsonp&dataType=jsonp&data=${encodeURIComponent(dataRaw)}`
+    resp = await fetch(url, { headers: { ...headers, Cookie: ck }, signal: AbortSignal.timeout(TIMEOUT) })
+  }
   const text = await resp.text()
 
   let json = text
-  const lb = text.indexOf('(')
-  const rb = text.lastIndexOf(')')
-  if (lb >= 0 && rb > lb) json = text.slice(lb + 1, rb)
+  if (!opts.json) {
+    const lb = text.indexOf('(')
+    const rb = text.lastIndexOf(')')
+    if (lb >= 0 && rb > lb) json = text.slice(lb + 1, rb)
+  }
 
   let parsed
   try {
@@ -160,12 +175,26 @@ function sliceJsonObject(text, start) {
 }
 
 /**
+ * 代收/代签（非本人签收）的文案特征：命中即视为「待取件」，而不是「已完成」。
+ * 覆盖：自提柜/驿站，以及前台/门卫/门口等代签。
+ */
+const PICKUP_POINT_HINTS = [
+  '自提柜', '快递柜', '驿站', '代收点', '代收', '凭取货码', '请及时取件', '已存放至',
+  '前台', '门卫', '门口', '门房', '保安', '物业', '代签',
+]
+
+/** 快递公司编码 → 中文名（拆单/多包裹订单只给 cpCode，无公司名） */
+const CP_CODE_NAMES = {
+  YTO: '圆通速递', ZTO: '中通快递', STO: '申通快递', YUNDA: '韵达速递',
+  SF: '顺丰速运', EMS: 'EMS', JD: '京东物流', JTSD: '极兔速递',
+  HTKY: '百世快递', BEST: '百世快递', YZPY: '邮政快递包裹', YZGN: '邮政国内',
+  UC: '优速快递', DBL: '德邦快递', ANE: '安能物流', GTO: '国通快递',
+}
+
+/**
  * SSR 物流页 → 包裹信息（免签名）。
- * 关键：取件码/驿站是 multiStage[].cardDesc 里的结构化字段，不是文案正则刮出来的 ——
- *   cardDesc.custom.expressCode.code = 取件码
- *   cardDesc.title                  = 驿站名（如「GX广西新媒体中心丰巢」）
- *   cardDesc.subTitle               = 详细地址
- * 因此本渠道无需第三方快递查询服务。
+ * 取件码/驿站优先取 multiStage[].cardDesc 结构化字段；该字段在部分版本已缺失，
+ * 此时驿站名回退到从物流文案提取（如「您的快件已存放至 xxx 丰巢柜」）。
  */
 async function fetchParcel(cookies, orderId) {
   const url = `https://pages-g.m.taobao.com/wow/z/app/mtb/logisticsV2/h5-detail?x-ssr=true&bizOrderId=${orderId}`
@@ -197,17 +226,31 @@ async function fetchParcel(cookies, orderId) {
   if (!fields) return null
 
   const company = fields.logisticCompany || {}
-  const mailNo = fields.mailNo || company.mailNo || ''
+  let mailNo = fields.mailNo || company.mailNo || ''
+  let cpName = company.name || ''
+
+  // 拆单/多包裹订单：无 mailNo 与 logisticCompany，运单号在 multiPackages.packages[].mailNo
+  if (!mailNo && fields.multiPackages) {
+    const pkgs = Array.isArray(fields.multiPackages.packages) ? fields.multiPackages.packages : []
+    const mp = pkgs.find(x => x && x.mailNo)
+    if (mp) {
+      mailNo = mp.mailNo
+      cpName = cpName || CP_CODE_NAMES[mp.cpCode] || mp.cpCode || ''
+    }
+  }
+
   if (!mailNo) return null
 
   const stages = Array.isArray(fields.multiStage) ? fields.multiStage : []
   let stateLabel = ''
   let latestText = ''
   let pickupCode = ''
+  let hintText = ''
   let station = ''
   let address = ''
   let recipient = ''
   let phone = ''
+  let atPickupPoint = false
 
   for (const s of stages) {
     const ld = s.labelDesc || {}
@@ -218,12 +261,23 @@ async function fetchParcel(cookies, orderId) {
 
     if (!stateLabel) stateLabel = s.title || ''
     if (!latestText) latestText = text
+    hintText += ' ' + (s.title || '') + ' ' + text
 
     const card = s.cardDesc || {}
     const ec = (card.custom && card.custom.expressCode) || null
     if (!pickupCode && ec && ec.code) pickupCode = String(ec.code).trim()
-    if (!station && card.title) station = String(card.title).trim()
+    if (!station) {
+      // cardDesc 结构在部分版本已缺失，驿站名回退到从物流文案提取
+      if (card.title) station = String(card.title).trim()
+      else { const st = extractStation(text); if (st) station = st }
+    }
     if (!address && card.subTitle) address = String(card.subTitle).trim()
+
+    // 已到达自提柜/驿站等待取件：丰巢等「已签收」实为柜子代签（签收人凭取货码签收），
+    // 标题出现「待取件」或文案含取件提示都算到达驿站
+    if (!atPickupPoint && (s.title === '待取件' || PICKUP_POINT_HINTS.some(h => text.includes(h)))) {
+      atPickupPoint = true
+    }
 
     // 兜底：个别驿站不给结构化字段，只在文案里写取件码
     if (!pickupCode && text) {
@@ -240,16 +294,110 @@ async function fetchParcel(cookies, orderId) {
     }
   }
 
+  // 拆单/多包裹订单：h5-detail 常只给「已发货，暂无物流信息」，真实轨迹在 transit_step，
+  // 用它补充「待取件」判定与驿站名（该接口响应为 GBK）
+  if (fields.multiPackages && mailNo) {
+    try {
+      const t = await fetchTransitSteps(cookies, orderId)
+      const latest = (t.steps[0] && t.steps[0].place) || ''
+      if (latest && (!latestText || latestText.includes('暂无物流信息'))) latestText = latest
+      if (!atPickupPoint && PICKUP_POINT_HINTS.some(h => latest.includes(h))) atPickupPoint = true
+      if (!station) { const st = extractStation(latest); if (st) station = st }
+      if (!cpName && t.expressName) cpName = t.expressName
+    } catch (e) { /* 轨迹补充失败不影响主流程 */ }
+  }
+
+  // 自提柜/驿站：最新节点为「已签收」，且轨迹里更早出现过「待取件/已存放至」等入柜节点
+  // → 说明是入柜之后凭取货码取走，属于已取件。
+  // 只有「已签收」而没有入柜节点的，仍按柜机代签处理，避免把刚入柜的件误判为已取。
+  const picked = stateLabel.includes('签收') && /待取件|已存放至|存放至|请及时取件/.test(hintText)
+
   return {
     mailNo,
-    cpName: company.name || '',
+    cpName,
     stateLabel,
     latestText,
+    hintText,
+    picked,
     pickupCode,
     station: station || address,
     address,
     recipient,
     phone,
+    atPickupPoint,
+  }
+}
+
+/** 从物流文案提取驿站/代收点名称（cardDesc 结构失效后的兜底） */
+function extractStation(text) {
+  if (!text) return ''
+  let m = text.match(/(?:存放至|已到达|存入)([^，,。【]+)/)
+  if (m && m[1]) return m[1].trim()
+  // 代签写法：「您的快件已由【前台】签收」→ 取「前台」
+  m = text.match(/由【(.+?)】/)
+  return m && m[1] ? m[1].trim() : ''
+}
+
+/**
+ * 物流轨迹（PC 接口 transit_step）：拆单/多包裹订单的 h5-detail 常不含轨迹，用它补充。
+ * 返回 { expressName, expressId, steps: [{place, time}] }；响应为 GBK 编码，需按 gbk 解码。
+ */
+async function fetchTransitSteps(cookies, orderId) {
+  const url = `https://buyertrade.taobao.com/trade/json/transit_step.do?bizOrderId=${orderId}`
+  const resp = await fetch(url, {
+    headers: {
+      'User-Agent': UA,
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Language': 'zh-CN,zh;q=0.9',
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: 'https://buyertrade.taobao.com/',
+      Cookie: cookies,
+    },
+    signal: AbortSignal.timeout(TIMEOUT),
+  })
+  const buf = Buffer.from(await resp.arrayBuffer())
+  let text
+  try { text = new TextDecoder('gbk').decode(buf) } catch (e) { text = buf.toString('utf8') }
+  const data = JSON.parse(text)
+  return {
+    expressName: data.expressName || '',
+    expressId: data.expressId || '',
+    steps: Array.isArray(data.address) ? data.address : [],
+  }
+}
+
+/**
+ * 待收货订单的取件码（PC 端 queryboughtlistV2，POST + originaljson）。
+ * 取件码在 data.data.comServiceTips_<orderId>.fields.singleLineRiceText[].richStr 里
+ * （形如「取件码 83993005」），待收货列表一个请求即可覆盖全部。
+ * 返回 { orderId: pickupCode }；失败返回 {}（取件码缺失不影响主流程）。
+ */
+async function fetchPickupCodes(cookies) {
+  try {
+    const dataObj = {
+      tabCode: 'waitConfirm',
+      appVersion: '3.0',
+      OrderType: 'OrderList',
+      condition: { inner: 1, deviceLevel: 'high', version: '1.0.0', reqFrom: 'tbpc' },
+      appName: 'tborder',
+      templateConfigVersion: 0,
+      forceBoughtlist4: 4,
+      page: '1',
+    }
+    const parsed = await mtopCall(cookies, 'mtop.taobao.order.queryboughtlistV2', '1.0', dataObj, 'h5api.m.taobao.com', { method: 'POST', json: true })
+    const cells = (parsed.data && parsed.data.data) || {}
+    const map = {}
+    for (const key of Object.keys(cells)) {
+      const cell = cells[key]
+      if (!key.startsWith('comServiceTips_') || !cell || !cell.fields) continue
+      const richText = Array.isArray(cell.fields.singleLineRiceText) ? cell.fields.singleLineRiceText : []
+      const text = richText.map(x => x && x.richStr || '').join(' ')
+      const m = text.match(/取件码\s*[:：]?\s*([A-Za-z0-9-]+)/)
+      if (m) map[cell.id || key.slice('comServiceTips_'.length)] = m[1]
+    }
+    return map
+  } catch (e) {
+    return {}
   }
 }
 
@@ -264,4 +412,4 @@ function parseRecipient(text) {
   return { recipient: t, phone: '' }
 }
 
-module.exports = { fetchOrders, fetchParcel, accumulateCookies, setCookieValue }
+module.exports = { fetchOrders, fetchParcel, fetchPickupCodes, accumulateCookies, setCookieValue }

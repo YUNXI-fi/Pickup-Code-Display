@@ -7,6 +7,8 @@ const { init } = require('./db')
 const setupRoutes = require('./routes/packages')
 const setupExpressRoutes = require('./routes/express')
 const setupPddRoutes = require('./routes/pdd')
+const setupSettingsRoutes = require('./routes/settings')
+const scheduler = require('./scheduler')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -90,9 +92,16 @@ app.get('/admin.html', adminAuth, (req, res) => {
 })
 app.use(express.static(path.join(__dirname, 'public')))
 
+// 动态数据接口不缓存：避免浏览器复用陈旧的快递列表
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store')
+  next()
+})
+
 setupRoutes(app)
 setupExpressRoutes(app)
 setupPddRoutes(app)
+setupSettingsRoutes(app)
 
 app.get('/api/check-password', (req, res) => {
   const pw = req.headers['x-admin-password']
@@ -113,6 +122,7 @@ async function start() {
     app.listen(SOCKET_PATH, () => {
       console.log(`服务已启动 (Unix Socket): ${SOCKET_PATH}`)
     })
+    scheduler.start()
     return
   }
 
@@ -121,6 +131,7 @@ async function start() {
     console.log(`服务已启动: http://localhost:${PORT}`)
     console.log(`局域网访问: http://<本机IP>:${PORT}`)
   })
+  scheduler.start()
 }
 
 start()

@@ -7,37 +7,127 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { theme: { extend: { colors: { primary: '#2563eb' } } } }
+    tailwind.config = { theme: { extend: { colors: { primary: '#2563eb', page: '#f6f7f9' } } } }
   </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+    /* 线性图标统一描边设置 */
+    .ico { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    /* 取件码用等宽字体 + 表格数字，避免数字宽度不齐导致字号视觉跳动 */
+    .code-font { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .card-shadow { box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06); }
+    /* 隐藏所有滚动条，但保留滚动能力 */
+    * { scrollbar-width: none; -ms-overflow-style: none; }
+    *::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <div class="flex items-center justify-between mb-6">
-      <a href="admin.html"><img src="favicon.svg" class="h-9 w-auto" alt="取件码展示"></a>
-      <span id="countBadge" class="bg-primary text-white px-4 py-1.5 rounded-full text-sm font-medium">0</span>
+<body class="bg-page min-h-screen text-gray-900 antialiased">
+
+<!-- 图标符号表（全站用 SVG，不使用 emoji） -->
+<svg class="hidden" aria-hidden="true">
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="m21 7-9-5-9 5v10l9 5 9-5V7Z"/><path d="m3 7 9 5 9-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></symbol>
+</svg>
+
+<div class="max-w-[1080px] mx-auto px-4 lg:px-10">
+
+  <!-- 顶栏 -->
+  <div class="flex items-center justify-between pt-4 pb-3 lg:pt-9 lg:pb-5">
+    <div class="flex items-center gap-3">
+      <a href="admin.html" aria-label="进入管理页"><img src="favicon.svg" class="h-8 lg:h-10 w-auto" alt="取件码展示"></a>
+      <div>
+        <h1 class="text-base lg:text-xl font-bold leading-tight">取件码展示</h1>
+        <p id="liveStatus" class="text-[11px] lg:text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>实时同步中
+        </p>
+      </div>
     </div>
 
-    <div id="statusBar" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg hidden transition-opacity duration-300"></div>
-
-    <div class="flex flex-col gap-2 mb-6">
-      <div class="flex rounded-lg overflow-hidden border border-gray-300 text-sm w-fit">
-        <button id="groupAddress" class="px-4 py-1.5 bg-primary text-white font-medium transition-colors">取件地址</button>
-        <button id="groupStatus" class="px-4 py-1.5 bg-white text-gray-600 transition-colors">取件情况</button>
-      </div>
-      <div class="flex rounded-lg overflow-hidden border border-gray-300 text-sm w-fit">
-        <button id="filterAll" class="px-4 py-1.5 bg-primary text-white font-medium transition-colors">全部<span id="countAll" class="ml-1.5 opacity-70">0</span></button>
-        <button id="filterPending" class="px-4 py-1.5 bg-white text-gray-600 transition-colors">待取件<span id="countPending" class="ml-1.5 opacity-70">0</span></button>
-        <button id="filterPicked" class="px-4 py-1.5 bg-white text-gray-600 transition-colors">已取件<span id="countPicked" class="ml-1.5 opacity-70">0</span></button>
-      </div>
+    <!-- PC：待取/已取 双计数 -->
+    <div class="hidden lg:flex items-center gap-2 h-11 px-4 rounded-xl bg-white border border-gray-200 card-shadow">
+      <span class="text-sm text-gray-500">待取件</span>
+      <span id="countPendingPc" class="text-lg font-bold text-emerald-600 code-font">0</span>
+      <span class="w-px h-4 bg-gray-200"></span>
+      <span class="text-sm text-gray-500">已取件</span>
+      <span id="countPickedPc" class="text-lg font-bold text-gray-400 code-font">0</span>
     </div>
 
-    <div id="list" class="space-y-6"></div>
-    <div id="empty" class="text-center py-20 text-gray-400 hidden">
-      <p class="text-6xl mb-4">📦</p>
-      <p class="text-lg">暂无可取件包裹</p>
+    <!-- 移动端：待取数量胶囊 -->
+    <div class="lg:hidden">
+      <span class="h-8 px-3 rounded-full bg-white border border-emerald-200 text-emerald-600 text-xs font-semibold inline-flex items-center gap-1">
+        待取 <span id="countPendingMb" class="code-font">0</span>
+      </span>
     </div>
   </div>
 
-  <script src="js/app.js"></script>
+  <!-- 工具栏（吸顶；用与页面同底色而非半透明面板，避免滚动时内容穿透） -->
+  <div class="sticky top-0 z-20 bg-page py-2.5 -mx-4 px-4 lg:py-3 lg:-mx-10 lg:px-10">
+    <!-- 移动端：状态分段 + 分组入口 -->
+    <div class="lg:hidden flex items-center gap-2">
+      <div class="flex-1 flex rounded-xl bg-white border border-gray-200 p-0.5 card-shadow">
+        <button id="filterPendingMb" class="mobile-seg flex-1 h-8 rounded-[10px] text-[13px] font-medium transition-colors">待取 <span id="countPendingMbSeg" class="opacity-70 code-font">0</span></button>
+        <button id="filterPickedMb" class="mobile-seg flex-1 h-8 rounded-[10px] text-[13px] font-medium transition-colors">已取 <span id="countPickedMbSeg" class="opacity-70 code-font">0</span></button>
+      </div>
+      <button id="groupMenuBtn" class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 card-shadow" aria-label="分组方式">
+        <svg class="ico w-4 h-4"><use href="#i-filter"/></svg>
+      </button>
+    </div>
+
+    <!-- 桌面端：分组切换 + 状态筛选 -->
+    <div class="hidden lg:flex items-center justify-between gap-2">
+      <div class="inline-flex rounded-xl bg-white border border-gray-200 p-0.5 card-shadow">
+        <button id="groupAddress" class="group-btn h-9 px-4 rounded-[10px] text-sm font-medium transition-colors">按取件地址</button>
+        <button id="groupStatus" class="group-btn h-9 px-4 rounded-[10px] text-sm font-medium transition-colors">按取件情况</button>
+      </div>
+
+      <div class="inline-flex rounded-xl bg-white border border-gray-200 p-0.5 card-shadow">
+        <button id="filterAll" class="filter-btn">全部 <span id="countAll" class="opacity-70 code-font">0</span></button>
+        <button id="filterPending" class="filter-btn">待取件 <span id="countPending" class="opacity-70 code-font">0</span></button>
+        <button id="filterPicked" class="filter-btn">已取件 <span id="countPicked" class="opacity-70 code-font">0</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="listPc" class="hidden lg:block space-y-8 pb-10"></div>
+  <div id="listMb" class="lg:hidden space-y-5 pb-8"></div>
+
+  <div id="empty" class="hidden flex-col items-center justify-center py-20 text-center">
+    <svg class="ico w-12 h-12 text-gray-300"><use href="#i-box"/></svg>
+    <p class="mt-3 text-base font-medium text-gray-500">暂无待取件包裹</p>
+    <p class="mt-1 text-xs text-gray-400">有包裹到达驿站时会自动出现在这里</p>
+  </div>
+</div>
+
+<div id="statusBar" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg hidden transition-opacity duration-300"></div>
+
+<!-- 分组方式（移动端底部菜单） -->
+<div id="groupSheet" class="fixed inset-0 z-50 hidden items-end bg-gray-900/40 lg:hidden">
+  <div class="w-full bg-white rounded-t-2xl pb-6">
+    <div class="pt-2.5 pb-1 flex justify-center"><span class="w-10 h-1 rounded-full bg-gray-300"></span></div>
+    <div class="px-4 pt-2 space-y-1">
+      <button data-group="address" class="group-opt w-full h-12 px-4 rounded-xl flex items-center justify-between text-sm transition-colors">
+        <span>按取件地址</span>
+        <span class="opt-check text-primary"><svg class="ico w-4 h-4"><use href="#i-check"/></svg></span>
+      </button>
+      <button data-group="status" class="group-opt w-full h-12 px-4 rounded-xl flex items-center justify-between text-sm transition-colors">
+        <span>按取件情况</span>
+        <span class="opt-check text-primary"><svg class="ico w-4 h-4"><use href="#i-check"/></svg></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 取件撤回 -->
+<div id="undoToast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden items-center gap-4 h-11 px-4 rounded-xl bg-gray-900 text-white shadow-lg">
+  <span class="text-[13px]">已标记取件</span>
+  <button id="undoBtn" class="text-[13px] font-medium flex items-center gap-1"><svg class="ico w-3.5 h-3.5"><use href="#i-undo"/></svg>撤回</button>
+</div>
+
+<script src="js/app.js"></script>
 </body>
 </html>
