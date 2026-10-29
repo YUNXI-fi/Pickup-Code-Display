@@ -1,34 +1,11 @@
 #!/bin/bash
 
-export PATH=/var/apps/nodejs_v22/target/bin:/var/apps/nodejs_v20/target/bin:/var/apps/nodejs_v18/target/bin:/usr/local/bin:/usr/bin:$PATH
+# 运行依赖已随安装包预置，安装阶段不再执行 npm。
+# 应用用户的 HOME（/home/<appname>）不可写，现场 npm install 会因缓存目录创建失败而报 EACCES。
 
-NODE="$(command -v node 2>/dev/null)"
-NPM="$(command -v npm 2>/dev/null)"
-
-if [ -z "$NODE" ] || [ -z "$NPM" ]; then
-    echo "Node.js 或 npm 环境不可用，请先确认已安装并启动 nodejs_v22 依赖应用" > ${TRIM_TEMP_LOGFILE}
+if [ ! -d "${TRIM_APPDEST}/server/node_modules/express" ]; then
+    echo "安装包缺少运行依赖，请重新下载完整的安装包后重试" > ${TRIM_TEMP_LOGFILE}
     exit 1
 fi
 
-cd "${TRIM_APPDEST}/server"
-
-if [ -d "node_modules" ]; then
-    exit 0
-fi
-
-echo "正在安装依赖..." > ${TRIM_TEMP_LOGFILE}
-echo "node: $($NODE -v)" >> ${TRIM_TEMP_LOGFILE}
-echo "npm: $($NPM -v)" >> ${TRIM_TEMP_LOGFILE}
-
-"$NPM" install --production >> ${TRIM_TEMP_LOGFILE} 2>&1
-if [ $? -eq 0 ]; then
-    exit 0
-fi
-
-"$NPM" install --production --registry=https://registry.npmmirror.com >> ${TRIM_TEMP_LOGFILE} 2>&1
-if [ $? -eq 0 ]; then
-    exit 0
-fi
-
-echo "npm install 全部失败，请在开发机预先安装依赖后重新打包" >> ${TRIM_TEMP_LOGFILE}
-exit 1
+exit 0

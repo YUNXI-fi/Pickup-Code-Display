@@ -1,39 +1,11 @@
 #!/bin/bash
 
-NODE=""
-NPM=""
-for p in \
-    /var/apps/nodejs_v22/target/bin/node \
-    /var/apps/nodejs_v20/target/bin/node \
-    /var/apps/nodejs_v18/target/bin/node \
-    /usr/local/bin/node \
-    /usr/bin/node; do
-    if [ -x "$p" ]; then
-        NODE="$p"
-        NPM="$(dirname "$p")/npm"
-        break
-    fi
-done
-[ -z "$NODE" ] && { NODE="node"; NPM="npm"; }
+# 运行依赖已随安装包预置，升级阶段不再执行 npm。
+# 应用用户的 HOME（/home/<appname>）不可写，现场 npm install 会因缓存目录创建失败而报 EACCES。
 
-cd ${TRIM_APPDEST}/server
-
-if [ -d "node_modules" ]; then
-    exit 0
+if [ ! -d "${TRIM_APPDEST}/server/node_modules/express" ]; then
+    echo "升级包缺少运行依赖，请重新下载完整的安装包后重试" > ${TRIM_TEMP_LOGFILE}
+    exit 1
 fi
 
-echo "正在更新依赖..." > ${TRIM_TEMP_LOGFILE}
-echo "node: $($NODE -v)" >> ${TRIM_TEMP_LOGFILE}
-
-$NPM install --production >> ${TRIM_TEMP_LOGFILE} 2>&1
-if [ $? -eq 0 ]; then
-    exit 0
-fi
-
-$NPM install --production --registry=https://registry.npmmirror.com >> ${TRIM_TEMP_LOGFILE} 2>&1
-if [ $? -eq 0 ]; then
-    exit 0
-fi
-
-echo "npm install 全部失败，请在开发机预先安装依赖后重新打包" >> ${TRIM_TEMP_LOGFILE}
-exit 1
+exit 0

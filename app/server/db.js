@@ -2,7 +2,10 @@ const initSqlJs = require('sql.js')
 const fs = require('fs')
 const path = require('path')
 
-const DB_PATH = process.env.TRIM_PKGVAR ? path.join(process.env.TRIM_PKGVAR, 'data.db') : path.join(__dirname, 'data.db')
+// 开发模式的数据库放在项目根 data/，不放进 app/ 目录：
+// fnpack 会把 app/ 全量打包且不读 .gitignore，库文件留在 app/ 内会连测试数据一起发布。
+const DEV_DATA_DIR = path.join(__dirname, '..', '..', 'data')
+const DB_PATH = process.env.TRIM_PKGVAR ? path.join(process.env.TRIM_PKGVAR, 'data.db') : path.join(DEV_DATA_DIR, 'data.db')
 let db = null
 
 function save() {
@@ -54,6 +57,7 @@ function prepare(sql) {
 }
 
 async function init() {
+  if (!process.env.TRIM_PKGVAR) fs.mkdirSync(DEV_DATA_DIR, { recursive: true })
   const SQL = await initSqlJs()
   const exists = fs.existsSync(DB_PATH)
   db = exists ? new SQL.Database(fs.readFileSync(DB_PATH)) : new SQL.Database()
